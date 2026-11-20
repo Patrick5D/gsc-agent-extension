@@ -1,0 +1,3 @@
+node_modules/
+bridge/.native-launcher
+.DS_Store

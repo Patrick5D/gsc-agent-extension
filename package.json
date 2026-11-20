@@ -1,0 +1,42 @@
+{
+  "name": "gsc-agent",
+  "version": "0.3.0",
+  "description": "Let your local AI agent request indexing in your logged-in Google Search Console tab, via MCP.",
+  "keywords": ["mcp", "google-search-console", "seo", "indexing", "chrome-extension", "agent"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Patrick5D/gsc-agent-extension.git"
+  },
+  "homepage": "https://github.com/Patrick5D/gsc-agent-extension#readme",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gsc-agent": "bridge/cli.js"
+  },
+  "files": [
+    "bridge/",
+    "extension/",
+    "README.en.md",
+    "CUSTOMIZE.md",
+    "!bridge/.native-launcher",
+    "!**/*.test.js",
+    "!**/CLAUDE.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "setup": "node bridge/cli.js setup",
+    "doctor": "node bridge/cli.js doctor",
+    "config": "node bridge/cli.js config"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.1"
+  }
+}

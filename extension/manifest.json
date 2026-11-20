@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "GSC Agent",
+  "version": "0.3.0",
+  "description": "将当前 Search Console 标签页连接到本机 agent。",
+  "permissions": [
+    "nativeMessaging",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://search.google.com/*"
+  ],
+  "action": {
+    "default_title": "连接当前 GSC 标签页"
+  },
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuzDOwFx08Jx4AKIFVekwUbtvhZKrPi8CI8CZRFfRtJ4v18NzOGqZeExC5zdj/N6f2M3qctHNZxrEH1d6Wej5WmP7PZNq72Tku+NCcZQJ98MSsCdLGUQnTdjtdlrDEND/jYEkLcfFbbAt520eRZ9bsLVt8Tdl0oEDyENW1dbJGUxkBOcipqmXldwByk3XjzGTXPEPdpsD1FhcCs1CFKAjdKGLPKWlBKcMizKweujY3sZQd42Nh36rw+tku7MBt41e3frQvc7Z27+Ur1g44WZ2pAO/NmCP6l47HxNY29GfpOeaQcIUkfhGj5tSE4oHiGPSpd8CHYW7NiV9wAqWiZE3dQIDAQAB"
+}
