@@ -23,7 +23,7 @@ npm run setup     # 把新版本复制到 ~/.gsc-agent
 ### 增加 GSC 界面语言
 
 1. 在 GSC 右上角的设置中切换到目标语言。
-2. 手动检查一个网址，记下页面上的原文：检查框的提示文字、「网址已收录 / 未收录」标题、「请求编入索引」按钮、成功对话框的文字和关闭按钮、资源选择器按钮的 aria-label（用开发者工具查看）。
+2. 手动检查一个网址，记下页面上的原文：检查框的提示文字、「网址已收录 / 未收录」标题、「网页索引编制」下的状态行、「请求编入索引」按钮、成功对话框的文字和关闭按钮、资源选择器按钮的 aria-label（用开发者工具查看）。
 3. 把原文用 `|` 加进 `extension/config.js` 的对应规则，例如：
 
    ```js
@@ -45,6 +45,7 @@ npm run setup     # 把新版本复制到 ~/.gsc-agent
 | 一直等不到报告，页面上其实有 GSC 的出错弹窗 | `problem`（把弹窗标题加进去，出现时立即停下） |
 | 找不到网址检查框 | `inspectInput` |
 | 一直等不到报告，或 `if_unindexed` 停在检查阶段 | `indexed`、`unindexed`、`requestButton` |
+| 检查结果没有 `reason` | `coverage` |
 | 点击后 `unconfirmed` | `confirmed` |
 | 返回 `notice`，需要手动关闭成功框 | `closeButton` |
 

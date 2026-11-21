@@ -13,7 +13,7 @@ Let your local AI agent (Claude Code, Codex, Cursor, Claude Desktop, …) use th
 ## What it does
 
 - **Single URL or batches.** Batches run in the background in order; duplicates in a batch run once.
-- **Three modes.** `submit` requests indexing (good for updated pages). `inspect` only checks index status. `if_unindexed` inspects first and submits only if the URL is clearly not indexed.
+- **Read-only by default.** When you ask about index status, the agent uses `gsc_inspect_url`, which never submits, costs no quota and reports why a page is not indexed. It submits only after you agree in the conversation: `submit` requests indexing (good for updated pages), `if_unindexed` inspects first and submits only if the URL is clearly not indexed. Batches also default to inspecting.
 - **Picks the property for you.** Supports URL-prefix and domain properties, using the open property if it already covers the URL, otherwise the most specific match.
 - **Protects your quota.** Counts submissions per property over 24 hours and stops at the limit. Batches wait 120 s after each confirmed submission by default.
 - **Stoppable, resumable, auditable.** Stop a batch at any time, resume from `remaining`, and query the local history.
@@ -63,15 +63,17 @@ A single submission can take up to about 4 minutes, so raise the tool timeout to
 
 Just ask your agent, for example:
 
-- "Request indexing for https://example.com/article with gsc_request_indexing."
+- "Is https://example.com/article indexed?" (inspect only)
+- "Request indexing for https://example.com/article."
 - "Check these 20 URLs, submit only the unindexed ones, and report each result."
 
 Which tab is used: an open GSC property tab, preferring the visible one, then the most recently viewed; a batch keeps the same tab. With none open, a GSC tab is opened in the background and reused. Clicking the extension icon on a GSC tab pins the agent there until that tab is closed. Set `AUTO_CONNECT` to `false` in `extension/config.js` to connect only when you click the icon.
 
 | Tool | Purpose |
 |---|---|
-| `gsc_request_indexing` | One URL: `url`, `mode`, `skip_recent_hours` |
-| `gsc_start_batch` | Background batch: `urls`, `mode`, `interval_seconds`, `skip_recent_hours` |
+| `gsc_inspect_url` | Read-only check of one URL with the reason, no quota used: `url` |
+| `gsc_request_indexing` | Submit one URL after the user agrees: `url`, `mode` (`submit` by default, or `if_unindexed`), `skip_recent_hours` |
+| `gsc_start_batch` | Background batch: `urls`, `mode` (`inspect` by default; submitting needs the user's consent), `interval_seconds`, `skip_recent_hours` |
 | `gsc_batch_status` | Progress, results, `current`, `remaining`, `nextAt` |
 | `gsc_stop_batch` | Stop after the current URL finishes |
 | `gsc_submission_history` | Local history filtered by `url` / `status` |
@@ -82,7 +84,7 @@ The result statuses are:
 | Status | Meaning |
 |---|---|
 | `submitted` | GSC confirmed the request |
-| `inspected` / `already_indexed` | Inspection finished, or the URL was skipped because it is already indexed |
+| `inspected` / `already_indexed` | Inspection finished, or the URL was skipped because it is already indexed. `reason` holds the report's status line, such as "Page is not indexed: Discovered – currently not indexed"; `submitted` also carries the `reason` seen before submitting |
 | `recently_submitted` | Skipped by `skip_recent_hours` |
 | `blocked` | Stopped before clicking (login, property, quota or error dialog) |
 | `unconfirmed` | Clicked but no confirmation was read; check the tab before retrying |

@@ -24,6 +24,8 @@ const rules = {
   indexed: /^(?:URL is on Google|网址已收录到 Google(?: 中| 上)?)$/i,
   // 检查报告标题：未收录。
   unindexed: /^(?:URL is not on Google|网址(?:尚未收录到|未收录到|不在) Google(?: 中| 上)?|网址未被 Google 收录)$/i,
+  // 报告中「网页索引编制」下的状态行，未收录时冒号后是原因，例如「网页未编入索引：已发现 - 尚未编入索引」。
+  coverage: /^(?:网页(?:已|未)编入索引|page is (?:not )?indexed)(?:\s*[:：].*)?$/i,
   // 「请求编入索引」按钮文字。
   requestButton: /^(请求编入索引|request indexing)(?:\s|$)/i,
   // 提交成功对话框文字。

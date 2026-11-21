@@ -11,7 +11,7 @@
 ## 能做什么
 
 - **单个或批量提交**：给 agent 一个或一组网址，它在后台按顺序处理，同批重复的网址只处理一次。
-- **三种模式**：`submit` 直接请求编入索引（适合更新过的页面）；`inspect` 只检查是否已收录；`if_unindexed` 先检查，明确未收录才提交。
+- **默认只检查**：问收录情况时 agent 用 `gsc_inspect_url` 只读检查，不消耗配额，并说出未收录原因。只有你在对话中明确同意提交，agent 才会调用提交：`submit` 直接请求编入索引（适合更新过的页面），`if_unindexed` 先检查，明确未收录才提交。批次默认也只检查。
 - **自动选资源**：按网址自动切换到对应的 GSC 资源，网址前缀资源和网域资源都支持。当前打开的资源已包含该网址时直接使用，否则选匹配最具体的那个。
 - **保护配额**：按资源统计 24 小时内的提交次数，到上限自动停下。批次中每次提交后默认间隔 120 秒，降低被限流的风险。
 - **可停止、可续跑、可追溯**：批次可以随时停止，未开始的网址可以交给新批次接着跑；每次操作都记录在本机。
@@ -59,13 +59,14 @@ npm run setup
 - **Codex**：在 `~/.codex/config.toml` 的 `[mcp_servers.gsc-agent]` 段加入 `tool_timeout_sec = 270`。
 - **不能调超时的客户端**：让 agent 用 `gsc_start_batch` 处理单个网址。它立即返回，之后用 `gsc_batch_status` 查结果。
 
-接好后重启客户端，确认工具列表中有 `gsc_request_indexing`。
+接好后重启客户端，确认工具列表中有 `gsc_inspect_url` 和 `gsc_request_indexing`。
 
 ## 使用
 
 直接用自然语言告诉 agent，例如：
 
-- 「用 gsc_request_indexing 提交 https://example.com/article」
+- 「https://example.com/article 收录了吗？」（只检查）
+- 「提交 https://example.com/article」
 - 「检查这 20 个网址有没有收录，只提交没收录的，做完逐条告诉我结果。」
 - 「查一下这个网址最近一次有没有确认提交，给我报告链接。」
 
@@ -80,8 +81,9 @@ npm run setup
 
 | 工具 | 作用 |
 |---|---|
-| `gsc_request_indexing` | 处理单个网址，参数：`url`、`mode`、`skip_recent_hours` |
-| `gsc_start_batch` | 后台按顺序处理一组网址，立即返回批次 `id`。参数：`urls`、`mode`、`interval_seconds`、`skip_recent_hours` |
+| `gsc_inspect_url` | 只读检查单个网址是否收录，返回原因，不消耗配额。参数：`url` |
+| `gsc_request_indexing` | 提交单个网址，须用户同意。参数：`url`、`mode`（`submit` 默认，或 `if_unindexed`）、`skip_recent_hours` |
+| `gsc_start_batch` | 后台按顺序处理一组网址，立即返回批次 `id`。参数：`urls`、`mode`（默认 `inspect`，提交须用户同意）、`interval_seconds`、`skip_recent_hours` |
 | `gsc_batch_status` | 查看批次进度、每条结果、进行中的网址和未开始的网址 |
 | `gsc_stop_batch` | 停止批次，进行中的网址会先执行完 |
 | `gsc_submission_history` | 查询本机操作记录，可按 `url`、`status` 筛选 |
@@ -92,7 +94,7 @@ npm run setup
 ### 结果状态
 
 - `submitted`：GSC 已确认收到请求。是否收录由 Google 另行决定。
-- `inspected` / `already_indexed`：检查完成，或已收录而跳过。
+- `inspected` / `already_indexed`：检查完成，或已收录而跳过。`reason` 是报告里的状态行，未收录时写明原因，例如「网页未编入索引：已发现 - 尚未编入索引」。`submitted` 也会带上提交前的 `reason`。
 - `recently_submitted`：命中 `skip_recent_hours`，按本机记录跳过。
 - `blocked`：点击提交前停下，比如未登录、找不到资源、遇到配额或出错提示。
 - `unconfirmed`：已经点了提交，但没读到明确确认。请先查看标签页，再决定要不要重试。
@@ -147,7 +149,7 @@ npm run setup
 npm test
 ```
 
-测试包括：用模拟的 Chrome 消息验证 MCP 到本机宿主的完整链路；用 jsdom 模拟页面验证页面脚本；用模拟的 chrome 接口验证扩展的自动连接与选页；验证命令行的安装、自检与卸载。测试不会向 Google 提交任何请求。资源选择器按真实 GSC 页面的结构搭建，报告页仍是简化模拟，不能代替在真实页面上核对。
+测试包括：用模拟的 Chrome 消息验证 MCP 到本机宿主的完整链路；用 jsdom 模拟页面验证页面脚本；用模拟的 chrome 接口验证扩展的自动连接与选页；验证命令行的安装、自检与卸载。测试不会向 Google 提交任何请求。资源选择器和报告区域按真实 GSC 页面的结构搭建，但仍不能代替在真实页面上核对。
 
 ## 许可证
 

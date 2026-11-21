@@ -1,13 +1,14 @@
 /**
  * [INPUT]: 读取 config.js 的文案规则与等待时间、当前 GSC 资源、目标网址、报告页面和本机配额判断。
- * [OUTPUT]: 返回检查状态或提交确认，关闭已识别的成功框。检查框或按钮被遮住时停下。
+ * [OUTPUT]: 返回检查状态、未收录原因或提交确认，关闭已识别的成功框。检查框或按钮被遮住时停下。
  * [POS]: 在标签页内完成单网址操作。函数随脚本注入，须自包含。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit", canSubmit = true) {
   const rule = name => new RegExp(...ui[name]);
   const visible = el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
-  const elements = selector => [...document.querySelectorAll(selector)].filter(visible);
+  const elements = (selector, root = document) => [...root.querySelectorAll(selector)].filter(visible);
+  const lines = el => el.innerText.split(/\n/).map(line => line.trim());
   const report = () => new URL(location.href);
   const property = report().searchParams.get('resource_id');
   let clicked = false;
@@ -43,7 +44,7 @@ export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit"
       }
       return false;
     };
-    const requestButtons = () => elements('button,[role="button"]').filter(el =>
+    const requestButtons = (root = document) => elements('button,[role="button"]', root).filter(el =>
       !el.disabled && el.getAttribute('aria-disabled') !== 'true' && rule('requestButton').test(el.innerText.trim()));
     const unblocked = (el, message) => {
       el.scrollIntoView?.({block:'center', inline:'center'});
@@ -87,10 +88,25 @@ export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit"
       });
     }
 
+    const indexedTitle = rule('indexed');
+    const unindexedTitle = rule('unindexed');
+    const coverage = rule('coverage');
+    const isHeadline = line => indexedTitle.test(line) || unindexedTitle.test(line);
+    // GSC 在同一页保留旧报告，每份报告是一个 role="main" 区域，新报告排在后面。旧报告隐藏前可能短暂可见，
+    // 所以优先看输入网址后新出现的区域，取其中最后一个带报告标题的。找不到这种区域时退回整页。
+    let before = new Set();
+    const reportArea = () => {
+      const areas = elements('[role="main"]');
+      const added = areas.filter(el => !before.has(el));
+      return [added, areas].map(list => list.filter(el => lines(el).some(isHeadline)).at(-1)).find(Boolean) || document.body;
+    };
+    const reasonIn = area => lines(area).find(line => coverage.test(line));
+
     const input = await wait(() => elements('input').find(el => rule('inspectInput').test(
       [el.placeholder, el.getAttribute('aria-label')].join(' '))), ui.timeouts.inspectInput, '找不到网址检查框，请检查 config.js 的 inspectInput 规则');
     await unblocked(input, '网址检查框被遮挡，请关闭 GSC 页面上的弹窗或菜单后重试');
     const previousId = report().searchParams.get('id');
+    before = new Set(document.querySelectorAll('[role="main"]'));
     input.focus();
     input.value = target.href;
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -98,21 +114,24 @@ export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit"
       input.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
     }
 
-    const indexedTitle = rule('indexed');
-    const unindexedTitle = rule('unindexed');
+    let headlineAt;
     const fresh = await wait(() => {
       const current = report();
       const id = current.searchParams.get('id');
       if (current.pathname !== '/search-console/inspect' || !id || id === previousId) return;
-      const lines = document.body.innerText.split(/\n/).map(line => line.trim());
-      if (!lines.some(line => shown.has(line))) return;
+      if (!lines(document.body).some(line => shown.has(line))) return;
+      const area = reportArea();
       if (mode !== 'submit') {
-        const headline = lines.find(line => indexedTitle.test(line) || unindexedTitle.test(line));
+        const headline = lines(area).find(isHeadline);
         if (!headline) return;
+        // 原因行可能比标题稍晚渲染，最多再等 2 秒；仍没有时照常返回，不带原因。
+        const reason = reasonIn(area);
+        headlineAt ??= Date.now();
+        if (!reason && Date.now() - headlineAt < 2000) return;
         const indexed = indexedTitle.test(headline);
-        if (mode === 'inspect' || indexed) return {indexed, headline};
+        if (mode === 'inspect' || indexed) return {indexed, headline, ...(reason && {reason})};
       }
-      return requestButtons()[0];
+      return requestButtons(area)[0];
     }, ui.timeouts.report);
     if ('indexed' in fresh) {
       return {status:mode === 'inspect' ? 'inspected' : 'already_indexed', ...fresh, url:target.href, reportUrl:location.href};
@@ -120,12 +139,13 @@ export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit"
     if (!canSubmit) throw Error('本机记录显示该资源 24 小时内的提交已达上限，未点击提交');
     // 报告渲染时按钮节点可能被替换，或旧报告的按钮留在新报告下方。每次重新找当前未被遮住的按钮。
     fresh.scrollIntoView?.({block:'center', inline:'center'});
-    const button = await wait(() => requestButtons().find(el => !covered(el)), ui.timeouts.unblock,
+    const reason = reasonIn(reportArea());
+    const button = await wait(() => requestButtons(reportArea()).find(el => !covered(el)), ui.timeouts.unblock,
       '「请求编入索引」按钮被遮挡，请关闭 GSC 页面上的弹窗或菜单后重试');
     button.click();
     clicked = true;
     const confirmation = await wait(() => dialogs().find(el => rule('confirmed').test(el.innerText)), ui.timeouts.confirmation);
-    const result = {status:'submitted', url:target.href, reportUrl:location.href, confirmation:confirmation.innerText.slice(0,500)};
+    const result = {status:'submitted', url:target.href, reportUrl:location.href, ...(reason && {reason}), confirmation:confirmation.innerText.slice(0,500)};
     const close = [...confirmation.querySelectorAll('button,[role="button"]')].find(el =>
       visible(el) && rule('closeButton').test(el.innerText.trim()));
     if (close) close.click();

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 使用临时主目录与模拟的 Chrome 消息管道。
- * [OUTPUT]: 验证单条兼容、版本报告与自检、本机配额（不计只读检查）、批次去重、互斥、进度、停止与中断续跑。
+ * [OUTPUT]: 验证单条兼容、版本报告与自检、本机配额（不计只读检查）、单条检查工具、批次默认只检查、批次去重、互斥、进度、停止与中断续跑。
  * [POS]: 从 MCP 客户端跨进程验证原生桥接协议。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -73,7 +73,7 @@ test('单 URL、配额与批次经过 MCP 和本机宿主', {timeout:20000}, asy
   answer({hello:{version}});
   await client.connect(new StdioClientTransport({command:process.execPath, args:['bridge/mcp.js'], env}));
   const {tools} = await client.listTools();
-  assert.deepEqual(tools.map(tool => tool.name), ['gsc_request_indexing','gsc_submission_history','gsc_start_batch','gsc_batch_status','gsc_stop_batch','gsc_doctor']);
+  assert.deepEqual(tools.map(tool => tool.name), ['gsc_inspect_url','gsc_request_indexing','gsc_submission_history','gsc_start_batch','gsc_batch_status','gsc_stop_batch','gsc_doctor']);
   const checks = Object.fromEntries((await invoke('gsc_doctor',{})).checks.map(check => [check.name, check]));
   assert.equal(checks['浏览器连接'].ok, true);
   assert.equal(checks['运行中的版本'].ok, true, checks['运行中的版本'].detail);
@@ -104,8 +104,15 @@ test('单 URL、配额与批次经过 MCP 和本机宿主', {timeout:20000}, asy
   answer({status:'blocked', error:'本机记录显示该资源 24 小时内的提交已达上限', property});
   assert.match(await limited, /上限/);
 
+  // 单条检查走只读模式，不受配额影响；提交工具不接受 inspect。
+  const checking = invoke('gsc_inspect_url',{url});
+  assert.deepEqual(await nextFrame(), {operation:{url, mode:'inspect'}});
+  answer({status:'inspected', indexed:false, reason:'网页未编入索引：已发现 - 尚未编入索引', property});
+  assert.match((await checking).reason, /已发现/);
+  await reject('gsc_request_indexing',{url, mode:'inspect'});
+
   const second = url + '2', third = url + '3';
-  const job = await invoke('gsc_start_batch',{urls:[url,url,second,third],mode:'inspect',interval_seconds:0});
+  const job = await invoke('gsc_start_batch',{urls:[url,url,second,third],interval_seconds:0});
   assert.equal(job.duplicates,1);
   assert.deepEqual(await nextFrame(),{operation:{url,mode:'inspect'}});
   assert.match(await reject('gsc_start_batch',{urls:[url]}), /仍在运行/);
@@ -125,7 +132,7 @@ test('单 URL、配额与批次经过 MCP 和本机宿主', {timeout:20000}, asy
 
   // 确认提交后进入 60 秒间隔，停止请求在等待中生效。
   const other = 'https://other.com/a', after = 'https://other.com/b';
-  const paced = await invoke('gsc_start_batch',{urls:[other, after],interval_seconds:60});
+  const paced = await invoke('gsc_start_batch',{urls:[other, after],mode:'submit',interval_seconds:60});
   assert.deepEqual(await nextFrame(),{operation:{url:other,mode:'submit',exhausted:[property]}});
   answer({status:'submitted',url:other,property:'sc-domain:other.com'});
   do progress = await invoke('gsc_batch_status',{id:paced.id}); while (!progress.nextAt);

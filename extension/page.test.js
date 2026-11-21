@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 用 jsdom 搭建模拟 GSC 页面，注入 submit.js 与 property.js 的函数源码。
- * [OUTPUT]: 验证网址比对、等待检查框、遮挡判断、旧按钮替换、跨资源提示、配额阻止、跳过已收录、资源列表展开与筛选。
- * [POS]: 以函数源码注入，确认注入函数自包含。资源选择器按真实 GSC 观察到的结构搭建，报告页仍为简化模拟。
+ * [OUTPUT]: 验证网址比对、等待检查框、未收录原因、残留旧报告、遮挡判断、旧按钮替换、跨资源提示、配额阻止、跳过已收录、资源列表展开与筛选。
+ * [POS]: 以函数源码注入，确认注入函数自包含。资源选择器与报告区域按真实 GSC 观察到的结构搭建。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import test from 'node:test';
@@ -37,7 +37,10 @@ function browser(path) {
   return page;
 }
 
-function inspectPage({property = 'sc-domain:example.com', headline = '网址未收录到 Google', shown, inputDelay = 0, ui = UI, outside = false, stale = false} = {}) {
+// 报告结构按真实 GSC 搭建：网址显示在报告区域上方，每份报告是一个 role="main" 区域，含标题、状态行和按钮。
+// oldReport 模拟同一页上一次检查留下、尚未隐藏的报告；reason 为 null 表示没有状态行。
+function inspectPage({property = 'sc-domain:example.com', headline = '网址未收录到 Google', reason = '网页未编入索引：已发现 - 尚未编入索引',
+  shown, inputDelay = 0, ui = UI, outside = false, stale = false, oldReport = false} = {}) {
   const page = browser('/search-console/performance/search-analytics?resource_id=' + encodeURIComponent(property));
   const {window, document, add} = page;
   page.clicks = 0;
@@ -55,10 +58,17 @@ function inspectPage({property = 'sc-domain:example.com', headline = '网址未�
           return;
         }
         window.history.pushState({}, '', '/search-console/inspect?resource_id=' + encodeURIComponent(property) + '&id=r1');
-        const main = document.querySelector('main');
-        main.replaceChildren();
-        add(main, shown ?? input.value);
+        const root = document.querySelector('main');
+        root.replaceChildren();
+        if (oldReport) {
+          const old = add(root, '', {role:'main'});
+          add(old, '网址已收录到 Google');
+          add(old, '网页已编入索引');
+        }
+        add(root, shown ?? input.value);
+        const main = add(root, '', {role:'main'});
         add(main, headline);
+        if (reason) add(main, reason);
         if (stale) {
           // 旧报告的按钮排在前面，被新报告的浮层盖住，点击无效。
           const old = add(main, '请求编入索引', {role:'button'});
@@ -110,8 +120,40 @@ test('检查框延迟渲染时等待出现', async () => {
   assert.equal(result.status, 'submitted', result.error);
 });
 
+test('只读检查返回未收录原因', async () => {
+  const page = inspectPage();
+  const result = await page.run('https://example.com/a', 'sc-domain:example.com', 'inspect');
+  assert.equal(result.status, 'inspected', result.error);
+  assert.equal(result.indexed, false);
+  assert.equal(result.reason, '网页未编入索引：已发现 - 尚未编入索引');
+});
+
+test('同一页残留旧报告时只读新报告', async () => {
+  const page = inspectPage({oldReport:true, reason:'网页未编入索引：Google 无法识别此网址'});
+  const result = await page.run('https://example.com/a', 'sc-domain:example.com', 'inspect');
+  assert.equal(result.indexed, false, result.error);
+  assert.equal(result.reason, '网页未编入索引：Google 无法识别此网址');
+});
+
+test('没有状态行时稍等后照常返回，不带原因', async () => {
+  const page = inspectPage({reason:null});
+  const started = Date.now();
+  const result = await page.run('https://example.com/a', 'sc-domain:example.com', 'inspect');
+  assert.equal(result.status, 'inspected', result.error);
+  assert.equal('reason' in result, false);
+  assert.ok(Date.now() - started < 4000);
+});
+
+test('提交结果附带提交前的未收录原因', async () => {
+  const page = inspectPage({oldReport:true});
+  const result = await page.run('https://example.com/a', 'sc-domain:example.com', 'if_unindexed');
+  assert.equal(result.status, 'submitted', result.error);
+  assert.equal(result.reason, '网页未编入索引：已发现 - 尚未编入索引');
+  assert.equal(page.clicks, 1);
+});
+
 test('if_unindexed 遇到已收录时不点击', async () => {
-  const page = inspectPage({headline:'网址已收录到 Google'});
+  const page = inspectPage({headline:'网址已收录到 Google', reason:'网页已编入索引'});
   const result = await page.run('https://example.com/a', 'sc-domain:example.com', 'if_unindexed');
   assert.equal(result.status, 'already_indexed');
   assert.equal(page.clicks, 0);
