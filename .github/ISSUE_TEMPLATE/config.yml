@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 增加界面语言或适配 GSC 改版 / Add a language or adapt to a GSC redesign
+    url: https://github.com/Patrick5D/gsc-agent-extension/blob/main/CUSTOMIZE.md
+    about: 多数情况只需改 extension/config.js 的文案规则，欢迎提 PR。/ Usually only the text rules in extension/config.js need changing. PRs welcome.

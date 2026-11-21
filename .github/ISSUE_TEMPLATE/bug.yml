@@ -1,0 +1,50 @@
+name: 问题反馈 / Bug report
+description: 工具报错、读不到报告、提交未确认等 / Errors, missing reports, unconfirmed submissions
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        贴输出前，请把其中的网址、资源名和报告链接替换成 example.com 之类的占位。
+        Before pasting, replace real URLs, property names and report links with placeholders such as example.com.
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么 / What happened
+      description: 让 agent 做了什么，返回了什么错误或状态。/ What you asked the agent, and the error or status it returned.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: 自检输出 / Self-check output
+      description: 运行 `npm run doctor -- --page` 并粘贴全部输出。/ Run `npm run doctor -- --page` and paste the full output.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      placeholder: 0.6.0
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: 系统与浏览器 / OS and browser
+      placeholder: macOS 15, Chrome 142
+    validations:
+      required: true
+  - type: input
+    id: language
+    attributes:
+      label: GSC 界面语言 / GSC interface language
+      placeholder: 简体中文 / English / …
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: agent 客户端 / Agent client
+      placeholder: Claude Code / Codex / Cursor / …

@@ -14,6 +14,7 @@ CHANGELOG.md - 版本记录与对外接口的兼容约定。
 CUSTOMIZE.md - 维护自己版本的改法。
 LICENSE - MIT 许可证。
 .github/workflows/test.yml - 在 macOS 与 Linux 上运行测试。
+.github/ISSUE_TEMPLATE/ - 问题反馈表单，要求附 doctor --page 输出、系统、浏览器与 GSC 语言。
 </config>
 
 按 URL 选择资源，单条或后台批次逐项执行，批次单个运行并按间隔提交。本机保存提交操作历史并按资源限额。Google 确认后才报告已提交。
