@@ -1,11 +1,15 @@
 /**
  * [INPUT]: 读取 config.js 的文案规则、目标 URL、当前资源和 GSC 的资源选项。
- * [OUTPUT]: 返回应使用的资源 ID，不点击选项。资源列表打不开时说明原因。
+ * [OUTPUT]: 返回应使用的资源 ID，不点击选项；自检时只返回列表中的网站资源。资源列表打不开时说明原因。
  * [POS]: 在网址检查前选择资源，由 worker 整页打开该资源。函数随脚本注入，须自包含。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
-export async function selectProperty(ui, rawUrl) {
-  try { return {property:await choose()}; } catch (error) { return {error:error.message}; }
+// list 为真时只展开列表并返回其中的网站资源，供页面自检核对选择器规则。
+export async function selectProperty(ui, rawUrl, list = false) {
+  try {
+    const value = await choose();
+    return list ? {properties:value} : {property:value};
+  } catch (error) { return {error:error.message}; }
   async function choose() {
     const target = new URL(rawUrl);
     if (!['https:', 'http:'].includes(target.protocol) || target.username || target.password) throw Error('请输入有效的 HTTP(S) 网址');
@@ -20,7 +24,7 @@ export async function selectProperty(ui, rawUrl) {
       if (!/^https?:\/\//.test(id) || !target.href.startsWith(id)) return 0;
       return 10000 + id.length;
     }
-    if (specificity(current)) return current;
+    if (!list && specificity(current)) return current;
     const picker = [...document.querySelectorAll('[role="button"][aria-label],button[aria-label]')]
       .find(el => new RegExp(...ui.propertyPicker).test(el.getAttribute('aria-label').trim()) && el.getClientRects().length);
     if (!picker) throw Error('找不到 GSC 资源选择器');
@@ -30,8 +34,8 @@ export async function selectProperty(ui, rawUrl) {
     const options = () => [...document.querySelectorAll('[role="option"][data-resourceid],[role="option"][aria-label]')].filter(el => el.getClientRects().length);
     const seen = new Set();
     const collect = () => { for (const el of options()) seen.add(el.dataset.resourceid || el.getAttribute('aria-label')); };
-    // 真实页面首次展开要先加载列表，约 0.5–0.7 秒；闲置较久的标签页曾出现 click 不响应。
-    // 依次尝试点击、按下鼠标和键盘，每种最多等 2 秒。
+    // 真实页面首次展开要先加载列表，约 0.5–0.7 秒。从未被人手点过选择器的标签页里，脚本的点击、鼠标和键盘事件都打不开列表；
+    // 人手点开一次后，即使刷新也能打开。依次尝试点击、按下鼠标和键盘，每种最多等 2 秒。
     // 列表已展开但选项还在加载时不再触发，避免把列表又关上。
     const attempts = [
       () => picker.click(),
@@ -46,6 +50,10 @@ export async function selectProperty(ui, rawUrl) {
       }
       if (!options().length) throw Error('GSC 资源列表没有展开。请在 GSC 页面手动点开一次资源选择框，关闭后重试');
       collect();
+      if (list) {
+        close();
+        return [...seen].filter(id => /^(sc-domain:|https?:\/\/)/.test(id));
+      }
       // 列表可能只渲染部分资源。有搜索框时，依次用完整主机名和各级上级域名筛选，汇总出现过的资源。
       const input = picker.querySelector('input[role="combobox"]');
       if (input) {

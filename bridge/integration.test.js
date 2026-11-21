@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 使用临时主目录与模拟的 Chrome 消息管道。
- * [OUTPUT]: 验证单条兼容、版本报告与自检、本机配额（不计只读检查）、单条检查工具、批次默认只检查、批次去重、互斥、进度、停止与中断续跑。
+ * [OUTPUT]: 验证单条兼容、版本报告与自检、页面自检、本机配额（不计只读检查）、单条检查工具、批次默认只检查、批次去重、互斥、进度、停止与中断续跑。
  * [POS]: 从 MCP 客户端跨进程验证原生桥接协议。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -77,6 +77,13 @@ test('单 URL、配额与批次经过 MCP 和本机宿主', {timeout:20000}, asy
   const checks = Object.fromEntries((await invoke('gsc_doctor',{})).checks.map(check => [check.name, check]));
   assert.equal(checks['浏览器连接'].ok, true);
   assert.equal(checks['运行中的版本'].ok, true, checks['运行中的版本'].detail);
+  // 页面自检交给扩展执行，不写操作历史。
+  const probing = invoke('gsc_doctor',{page:true});
+  assert.deepEqual(await nextFrame(), {operation:{mode:'probe'}});
+  answer({checks:[{name:'网址检查', ok:false, detail:'找不到网址检查框', fix:'inspectInput'}]});
+  const probed = await probing;
+  assert.equal(probed.ok, false);
+  assert.equal(probed.checks.at(-1).name, '页面：网址检查');
   const invalid = await reject('gsc_request_indexing',{url:'not a url'});
   assert.match(invalid, /完整的 http/);
   assert.doesNotMatch(invalid, /账户密码/);

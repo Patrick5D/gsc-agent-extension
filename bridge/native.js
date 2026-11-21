@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 从本机套接字接收 URL 与操作模式或状态询问，从 Chrome 读取带长度的 JSON。
+ * [INPUT]: 从本机套接字接收 URL 与操作模式、页面自检或状态询问，从 Chrome 读取带长度的 JSON。
  * [OUTPUT]: 向选中的扩展连接发送任务，向调用方返回结果、宿主与扩展版本。
  * [POS]: 由 Chrome 启动，每个浏览器连接占一个套接字，退出或收到信号时删除。只依赖 Node 内置模块。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -33,7 +33,7 @@ const server = net.createServer(socket => {
       if (message.ping) return socket.end(JSON.stringify({ pong: true, host: version, extension, busy: Boolean(active) }) + '\n');
       if (active) throw Error('已有任务执行中');
       const { url } = message.operation || message;
-      if (typeof url !== 'string') throw Error('缺少网址');
+      if (typeof url !== 'string' && message.operation?.mode !== 'probe') throw Error('缺少网址');
       active = socket;
       sendChrome(message.operation ? { operation:message.operation } : {url});
     } catch (err) {

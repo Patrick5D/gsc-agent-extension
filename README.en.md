@@ -17,7 +17,7 @@ Let your local AI agent (Claude Code, Codex, Cursor, Claude Desktop, …) use th
 - **Picks the property for you.** Supports URL-prefix and domain properties, using the open property if it already covers the URL, otherwise the most specific match.
 - **Protects your quota.** Counts submissions per property over 24 hours and stops at the limit. Batches wait 120 s after each confirmed submission by default.
 - **Stoppable, resumable, auditable.** Stop a batch at any time, resume from `remaining`, and query the local history.
-- **Self-check.** One command verifies installation, browser connection and versions, and tells you how to fix problems.
+- **Self-check.** One command verifies installation, browser connection and versions, and tells you how to fix problems. Add `--page` for a read-only pass on the real GSC page that names the broken rule after a GSC redesign.
 
 It does not guarantee indexing, read performance data or submit sitemaps.
 
@@ -29,7 +29,8 @@ AI agent ──MCP──> local MCP server ──socket──> native host ─�
 
 ## Requirements
 
-- macOS with Google Chrome
+- macOS or Linux. Windows is not supported yet.
+- A Chromium browser: Chrome, Chromium, Edge, Brave, Vivaldi, or Arc on macOS. On Linux, Snap and Flatpak browsers cannot launch native hosts; use the official packages.
 - Node.js 22.22+
 - GSC interface language: English or Simplified Chinese (other languages: see [CUSTOMIZE.md](CUSTOMIZE.md))
 
@@ -42,11 +43,11 @@ npm install
 npm run setup
 ```
 
-`setup` copies the extension and native host to `~/.gsc-agent/`, registers the host with Chrome, and prints the next steps:
+`setup` copies the extension and native host to `~/.gsc-agent/`, registers the host with every installed browser, and prints the next steps. Run it again after installing another browser.
 
-1. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and choose `~/.gsc-agent/extension`. Press ⌘⇧. in the file picker to show hidden folders.
+1. Open the browser's extensions page (`chrome://extensions`, `edge://extensions`, `brave://extensions`…), enable **Developer mode**, click **Load unpacked** and choose `~/.gsc-agent/extension`. On macOS, press ⌘⇧. in the file picker to show hidden folders.
 2. Add the MCP server to your agent (see below).
-3. Make sure Chrome is logged into Search Console. The extension connects on its own and the badge shows **ON**.
+3. Make sure the browser is logged into Search Console. The extension connects on its own and the badge shows **ON**.
 4. Run `npm run doctor`. Every check should pass.
 
 ## Connect your agent
@@ -95,6 +96,10 @@ Batch and quota rules:
 - Set the per-property limit with `GSC_AGENT_DAILY_QUOTA` (default 10). `0` disables it.
 - Chrome throttles timers in background tabs. For long batches, keep the GSC tab in use in its own visible window.
 
+## Upgrading
+
+`git pull && npm install && npm run setup`, reload the extension, and restart the agent's MCP connection. Check [CHANGELOG.md](CHANGELOG.md) (Simplified Chinese) for changes marked **不兼容** (breaking).
+
 ## Maintain your own version
 
 Everything customizable lives in two files. `extension/config.js` holds the auto-connect switch, the GSC text rules, the native host name and the page timeouts. `bridge/config.js` holds the data directory and the defaults. See [CUSTOMIZE.md](CUSTOMIZE.md) (Simplified Chinese) for adding a GSC language, adapting to a GSC redesign, or using your own extension ID.
@@ -103,7 +108,16 @@ Everything customizable lives in two files. `extension/config.js` holds the auto
 
 - This tool automates the GSC web UI. It is not an official API, so a GSC redesign can break it.
 - Judge for yourself whether automation fits Google's terms of service, and keep the submission rate close to normal manual use.
-- macOS + Google Chrome only, for now.
+- macOS and Linux only; no Windows yet.
+- Switching properties needs the property list. In a GSC tab where the property picker has never been clicked by hand (including the tab the extension opens in the background), scripts cannot open that list. Open and close the picker once by hand in that tab; it keeps working after reloads. URLs inside the current property are not affected.
+- If the agent reports errors such as "找不到网址检查框" (inspect box not found), run `npm run doctor -- --page`. It inspects the current property's home page read-only and names the rule in `extension/config.js` that no longer matches.
+
+## Security boundaries
+
+- **The trust boundary is your OS account.** The native host listens on a socket under `~/.gsc-agent/`, readable only by you, but any program running as you can use it to drive your logged-in GSC.
+- **Small extension permissions:** native messaging, scripting, and `https://search.google.com/*` only. No other sites, no Google credentials.
+- **"Submit only with consent" is an instruction to the agent, not a hard block.** The hard limit is the per-property daily cap `GSC_AGENT_DAILY_QUOTA`.
+- **History stays local** in `~/.gsc-agent/history/` and contains URLs and report links.
 
 ## Development
 

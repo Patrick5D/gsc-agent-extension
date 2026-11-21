@@ -298,6 +298,13 @@ test('资源列表打不开时明确提示', async () => {
   assert.match((await page.run('https://example.com/')).error, /没有展开/);
 });
 
+test('自检时只展开列表，返回其中的网站资源', async () => {
+  const page = pickerPage([...many, 'sc-domain:example.com'], 'sc-domain:example.com');
+  const result = await page.inject(selectProperty)(UI, 'https://gsc-agent-probe.invalid/', true);
+  assert.deepEqual([...result.properties], many.slice(0, 3), result.error);
+  assert.equal(page.clicked, undefined);
+});
+
 test('没有匹配资源时返回错误', async () => {
   const page = pickerPage(many, many[0]);
   assert.match((await page.run('https://nomatch.org/')).error, /没有匹配/);

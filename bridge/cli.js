@@ -31,7 +31,7 @@ const CLIENTS = {
     'tool_timeout_sec = 270'
   ].join('\n'),
   cursor: () => '# 写入 ~/.cursor/mcp.json：\n' + json,
-  'claude-desktop': () => '# 写入 ~/Library/Application Support/Claude/claude_desktop_config.json：\n' + json,
+  'claude-desktop': () => '# macOS 上写入 ~/Library/Application Support/Claude/claude_desktop_config.json：\n' + json,
   json: () => json
 };
 function config(client) {
@@ -48,7 +48,7 @@ const HELP = `gsc-agent ${pkg.version}
 
   setup              复制扩展和本机宿主到 ~/.gsc-agent，注册 Chrome 宿主
   config [客户端]    打印 MCP 配置：${Object.keys(CLIENTS).join(' | ')}
-  doctor             检查安装、浏览器连接和版本
+  doctor [--page]    检查安装、浏览器连接和版本；--page 再在真实 GSC 页面只读核对文案规则
   uninstall          删除宿主注册与复制的文件，保留操作历史
   keygen             为自己的分支版本生成新扩展 ID
   mcp                启动 MCP 服务（由 agent 客户端调用）
@@ -61,32 +61,35 @@ try {
     console.log(`已安装 GSC Agent ${result.version}
   扩展：${result.extension}
   扩展 ID：${result.id}
+  已注册的浏览器：${result.manifests.map(item => item.browser).join('、')}
   宿主注册：${result.manifests.map(item => item.path).join('、')}
   宿主使用的 Node：${result.node}
 
 下一步：
-1. 打开 chrome://extensions，开启「开发者模式」，点击「加载已解压的扩展程序」，选择：
+1. 打开浏览器的扩展管理页（Chrome 为 chrome://extensions，Edge 为 edge://extensions，Brave 为 brave://extensions），
+   开启「开发者模式」，点击「加载已解压的扩展程序」，选择：
    ${result.extension}
-   已加载过的，点击该扩展卡片上的刷新按钮。
+   已加载过的，点击该扩展卡片上的刷新按钮。之后再装其他 Chromium 系浏览器，重新运行 setup。
 2. 把 MCP 服务加入你的 agent（重新打印：gsc-agent config）：
 
 ${config()}
 
-3. 确认 Chrome 已登录 Search Console，扩展会自动连接，徽标显示 ON。
+3. 确认浏览器已登录 Search Console，扩展会自动连接，徽标显示 ON。
    （extension/config.js 的 AUTO_CONNECT 为 false 时，需在 GSC 页面点击扩展图标。）
-4. 运行 gsc-agent doctor 检查（仓库内为 npm run doctor）。`);
+4. 运行 gsc-agent doctor 检查（仓库内为 npm run doctor）；想在真实页面核对规则，加 --page。`);
   } else if (command === 'config') {
     console.log(config(arg));
   } else if (command === 'doctor') {
     const { doctor } = await import('./doctor.js');
-    const report = await doctor();
+    if (arg === '--page') console.log('页面自检是只读的：展开资源列表，检查当前资源首页，不会点击「请求编入索引」，也不计入配额。约需 10–30 秒…\n');
+    const report = await doctor({page: arg === '--page'});
     for (const check of report.checks) {
       console.log((check.ok ? '✓ ' : '✗ ') + check.name + '：' + check.detail + (check.fix ? '\n    → ' + check.fix : ''));
     }
     process.exitCode = report.ok ? 0 : 1;
   } else if (command === 'uninstall') {
     const removed = await uninstall();
-    console.log('已删除：\n' + removed.map(path => '  ' + path).join('\n') + '\n操作历史保留在 ~/.gsc-agent。请在 chrome://extensions 移除 GSC Agent 扩展。');
+    console.log('已删除：\n' + removed.map(path => '  ' + path).join('\n') + '\n操作历史保留在 ~/.gsc-agent。请在浏览器的扩展管理页移除 GSC Agent 扩展。');
   } else if (command === 'keygen') {
     const result = await keygen();
     console.log(`已写入新公钥：${result.manifest}

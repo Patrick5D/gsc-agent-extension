@@ -15,7 +15,7 @@
 - **自动选资源**：按网址自动切换到对应的 GSC 资源，网址前缀资源和网域资源都支持。当前打开的资源已包含该网址时直接使用，否则选匹配最具体的那个。
 - **保护配额**：按资源统计 24 小时内的提交次数，到上限自动停下。批次中每次提交后默认间隔 120 秒，降低被限流的风险。
 - **可停止、可续跑、可追溯**：批次可以随时停止，未开始的网址可以交给新批次接着跑；每次操作都记录在本机。
-- **自检**：一条命令检查安装、浏览器连接和版本是否一致，并给出修复办法。
+- **自检**：一条命令检查安装、浏览器连接和版本是否一致，并给出修复办法；加上 `--page` 还会在真实 GSC 页面只读核对一遍，GSC 改版时能直接指出要改哪条规则。
 
 不能做的事：不能保证 Google 收录（只负责把请求送到）；不读取搜索表现数据，也不提交 sitemap。
 
@@ -29,7 +29,8 @@ AI agent ──MCP──> 本机 MCP 服务 ──套接字──> 本机宿主 
 
 ## 环境要求
 
-- macOS 与 Google Chrome
+- macOS 或 Linux。Windows 暂不支持。
+- Chromium 系浏览器：Chrome、Chromium、Edge、Brave、Vivaldi，macOS 上还有 Arc。Linux 上用 Snap 或 Flatpak 安装的浏览器不能启动本机宿主，请改用官方安装包。
 - Node.js 22.22 或更高版本
 - GSC 界面语言为简体中文或英文（其他语言见[维护自己的版本](CUSTOMIZE.md)）
 
@@ -42,11 +43,11 @@ npm install
 npm run setup
 ```
 
-`setup` 把扩展和本机宿主复制到 `~/.gsc-agent/`，在 Chrome 中注册宿主，然后打印后续步骤：
+`setup` 把扩展和本机宿主复制到 `~/.gsc-agent/`，为已安装的浏览器注册宿主，然后打印后续步骤。之后再装其他浏览器，重新运行一次 `setup`。
 
-1. 打开 `chrome://extensions`，开启「开发者模式」，点击「加载已解压的扩展程序」，选择 `~/.gsc-agent/extension`（setup 会打印完整路径；在选择框中按 ⌘⇧. 可显示隐藏目录）。
+1. 打开浏览器的扩展管理页（Chrome 为 `chrome://extensions`，Edge 为 `edge://extensions`，Brave 为 `brave://extensions`），开启「开发者模式」，点击「加载已解压的扩展程序」，选择 `~/.gsc-agent/extension`（setup 会打印完整路径；macOS 的选择框中按 ⌘⇧. 可显示隐藏目录）。
 2. 把 MCP 服务加入你的 agent，见下一节。
-3. 确认 Chrome 已登录 Search Console。扩展加载后会自动连接，徽标显示 ON。
+3. 确认浏览器已登录 Search Console。扩展加载后会自动连接，徽标显示 ON。
 4. 运行 `npm run doctor`，全部打勾即可使用。
 
 ## 接入 agent
@@ -113,7 +114,11 @@ npm run setup
 
 ## 自检与排错
 
-运行 `npm run doctor`，或让 agent 调用 `gsc_doctor`，按提示处理。常见情况：
+运行 `npm run doctor`，或让 agent 调用 `gsc_doctor`，按提示处理。
+
+怀疑 GSC 改版或换了界面语言时，运行 `npm run doctor -- --page`（agent 调用时传 `page: true`）。它会在你的 GSC 标签页上展开资源列表，再只读检查当前资源的首页，不提交，约需 10–30 秒。哪一项失败，就提示改 `extension/config.js` 里的哪条规则。
+
+常见情况：
 
 | 现象 | 处理 |
 |---|---|
@@ -122,7 +127,8 @@ npm run setup
 | 「自动打开的 GSC 页面没有进入资源页」 | 在 Chrome 登录 Search Console，然后重试 |
 | 「网址检查框被遮挡」或「按钮被遮挡」 | 关闭 GSC 页面上的弹窗；如果菜单盖住了检查框，把左侧菜单收起或把窗口拉宽 |
 | 「使用中的 GSC 标签页已关闭或刷新」 | 重试即可，会自动换一个标签页 |
-| 「找不到网址检查框」或一直等不到报告 | 把 GSC 界面语言切换为简体中文或英文，或按 [CUSTOMIZE.md](CUSTOMIZE.md) 添加规则 |
+| 「找不到网址检查框」或一直等不到报告 | 运行 `npm run doctor -- --page` 找出失效的规则；或把 GSC 界面语言切换为简体中文或英文，或按 [CUSTOMIZE.md](CUSTOMIZE.md) 添加规则 |
+| 「GSC 资源列表没有展开」 | 在该 GSC 标签页手动点开一次资源选择框再关闭，然后重试。见下方「局限与风险」 |
 | 工具调用超时 | 调大客户端超时，或改用 `gsc_start_batch` |
 | 切换或删除过 Node 版本 | 重新运行 `npm run setup` |
 | 批次在后台很慢 | 把正在使用的 GSC 标签页放到单独的可见窗口 |
@@ -130,8 +136,8 @@ npm run setup
 
 ## 升级与卸载
 
-- **升级**：`git pull && npm install && npm run setup`，然后在 `chrome://extensions` 刷新扩展，再重启 agent 的 MCP 连接。
-- **卸载**：`node bridge/cli.js uninstall`，然后在 `chrome://extensions` 移除扩展。操作历史会保留在 `~/.gsc-agent/`。
+- **升级**：`git pull && npm install && npm run setup`，然后在扩展管理页刷新扩展，再重启 agent 的 MCP 连接。升级前看一眼 [CHANGELOG.md](CHANGELOG.md)，标注「不兼容」的改动可能需要改你给 agent 的提示词。
+- **卸载**：`node bridge/cli.js uninstall`，然后在扩展管理页移除扩展。操作历史会保留在 `~/.gsc-agent/`。
 
 ## 维护自己的版本
 
@@ -141,7 +147,15 @@ npm run setup
 
 - 本工具操作的是 GSC 网页，不是官方 API。GSC 改版可能导致它失效，失效时按 CUSTOMIZE.md 更新规则即可。
 - 自动操作网页的用法是否符合 Google 的服务条款，请自行判断。请把提交频率控制在正常人工使用的范围内。
-- 目前只支持 macOS 上的 Google Chrome。
+- 目前只支持 macOS 和 Linux，Windows 暂不支持。
+- 跨资源切换要打开资源列表。从未被人手点过资源选择框的 GSC 标签页（包括扩展在后台新开的那页），脚本打不开这个列表。在该页手动点开一次再关闭即可，之后刷新也有效。目标网址就在当前资源中时不受影响。
+
+## 安全边界
+
+- **本机信任范围是你的系统账户。** 本机宿主在 `~/.gsc-agent/` 下开套接字，目录只有你自己能读写。但同一账户下运行的任何程序，都能通过它操作你已登录的 GSC，和你在同一账户下运行的其他工具一样。不要在不信任的环境里安装。
+- **扩展权限很小。** 只申请原生消息、脚本注入，以及 `https://search.google.com/*` 的站点权限。它不读其他网站，也不接触 Google 的登录凭据。
+- **「提交须经你同意」是写给 agent 的规则，不是硬性拦截。** 工具说明要求 agent 在你明确同意后才调用提交；真正挡住大量误提交的硬限制，只有按资源计算的每日上限 `GSC_AGENT_DAILY_QUOTA`。
+- **操作历史只存在本机** `~/.gsc-agent/history/`，里面有网址和报告链接，分享截图或日志时注意。
 
 ## 开发与测试
 

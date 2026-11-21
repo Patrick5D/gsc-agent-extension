@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收浏览器启动、标签页变化、工具栏点击、网址、操作模式和已达本机配额的资源，读取 config.js。
- * [OUTPUT]: 连接后报告扩展版本，选定 GSC 标签页并整页打开目标资源，向桥接进程返回本次提交结果。
+ * [OUTPUT]: 连接后报告扩展版本，选定 GSC 标签页并整页打开目标资源，向桥接进程返回本次提交结果；页面自检时逐项返回核对结果。
  * [POS]: 自动连接时选用已打开的 GSC 标签页，没有就后台新开；点击图标固定到当前页。手动模式下只操作被点击的标签页，关闭后断开。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -103,7 +103,7 @@ function connect() {
     busy = true;
     let response;
     try {
-      response = await operate(message.operation || message);
+      response = await (message.operation?.mode === 'probe' ? probe() : operate(message.operation || message));
     } finally {
       busy = false;
     }
@@ -143,6 +143,37 @@ async function pickTab() {
   return tab.id;
 }
 
+const isGone = error => /No tab with id|Frame with ID \d+ was removed|tab was closed/i.test(error.message);
+
+// 页面自检：在真实 GSC 页面上只读核对 config.js 的规则。展开资源列表后关闭，再检查当前资源的首页，不点击提交。
+const PROBE_URL = 'https://gsc-agent-probe.invalid/';
+const RULES = '对照 CUSTOMIZE.md「GSC 改版后失效」一节，在 extension/config.js 中修改 ';
+async function probe() {
+  const checks = [];
+  const add = (name, ok, detail, rules) => checks.push(ok ? {name, ok, detail} : {name, ok, detail, fix: RULES + rules});
+  try {
+    const tabId = await pickTab();
+    const [{result: page}] = await chrome.scripting.executeScript({ target: { tabId },
+      func: () => ({ url: location.href, lang: document.documentElement.lang }) });
+    const property = new URL(page.url).searchParams.get('resource_id');
+    checks.push({name: 'GSC 资源页', ok: true, detail: property + '，界面语言 ' + (page.lang || '未知')});
+    const [list] = await chrome.scripting.executeScript({ target: { tabId }, func: selectProperty, args: [UI, PROBE_URL, true] });
+    const properties = list?.result?.properties;
+    const listError = list?.result?.error || '';
+    if (/没有展开/.test(listError)) {
+      // 从未被人手点过选择器的标签页里，脚本打不开列表，与文案规则无关。
+      checks.push({name: '资源列表', ok: false, detail: listError, fix: '在该 GSC 标签页手动点开一次资源选择框再关闭，然后重新自检。跨资源操作前也需要这样做'});
+    } else add('资源列表', Boolean(properties?.length), listError || properties.length + ' 个网站资源', 'propertyPicker');
+    const home = property.startsWith('sc-domain:') ? 'https://' + property.slice(10) + '/' : property;
+    const result = await operate({ url: home, mode: 'inspect' });
+    add('网址检查（只读，未提交）', result.status === 'inspected', result.error || home + '：' + result.headline, 'inspectInput、indexed、unindexed、problem');
+    if (result.status === 'inspected') add('收录状态行', Boolean(result.reason), result.reason || '报告中没有读到状态行', 'coverage');
+  } catch (error) {
+    checks.push({name: 'GSC 标签页', ok: false, detail: isGone(error) ? TAB_GONE : error.message});
+  }
+  return { checks };
+}
+
 async function operate({url, mode = 'submit', exhausted = []}) {
   let property;
   let submitting = false;
@@ -169,8 +200,7 @@ async function operate({url, mode = 'submit', exhausted = []}) {
     });
     return { ...(frame?.result || { status: mode === 'inspect' ? 'blocked' : 'unconfirmed', error: '页面已离开或未返回确认' }), property };
   } catch (error) {
-    const gone = /No tab with id|Frame with ID \d+ was removed|tab was closed/i.test(error.message);
     // 只读检查不会点击。提交模式在页面脚本运行中中断时，无法确定是否已点击。
-    return { error: gone ? TAB_GONE : error.message, status: submitting && mode !== 'inspect' ? 'unconfirmed' : 'blocked', property };
+    return { error: isGone(error) ? TAB_GONE : error.message, status: submitting && mode !== 'inspect' ? 'unconfirmed' : 'blocked', property };
   }
 }

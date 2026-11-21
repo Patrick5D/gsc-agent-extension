@@ -1,10 +1,11 @@
 /**
  * [INPUT]: 读取本项目的扩展目录、宿主文件、Node 路径和扩展公钥。
- * [OUTPUT]: 把扩展与宿主复制到数据目录，写入 Chrome 原生宿主清单；卸载；生成新扩展公钥。
+ * [OUTPUT]: 把扩展与宿主复制到数据目录，为已安装的 Chromium 系浏览器写入原生宿主清单；卸载；生成新扩展公钥。
  * [POS]: 安装后不再依赖项目位置，npx 缓存或移动仓库都不影响已注册的宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 import { chmod, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,14 +20,32 @@ export const launcher = join(hostDir, 'launcher');
 // 本机宿主运行所需文件。宿主只能依赖 Node 内置模块和这里列出的文件。
 const HOST_FILES = ['native.js', 'config.js'];
 
-// Chrome 系浏览器在 macOS 上的原生宿主目录。新增浏览器时在此加一行。
+// Chromium 系浏览器的用户数据目录，原生宿主清单放在其下的 NativeMessagingHosts。新增浏览器时在此加一行。
+// 目录存在才注册（视为已安装），Chrome 总会注册。Linux 的目录位于 $XDG_CONFIG_HOME，默认 ~/.config。
 const BROWSERS = {
-  darwin: {chrome: 'Library/Application Support/Google/Chrome/NativeMessagingHosts'}
+  darwin: {
+    base: () => join(homedir(), 'Library/Application Support'),
+    dirs: {
+      chrome: 'Google/Chrome', 'chrome-beta': 'Google/Chrome Beta', 'chrome-canary': 'Google/Chrome Canary',
+      chromium: 'Chromium', edge: 'Microsoft Edge', brave: 'BraveSoftware/Brave-Browser',
+      vivaldi: 'Vivaldi', arc: 'Arc/User Data'
+    }
+  },
+  linux: {
+    base: () => process.env.XDG_CONFIG_HOME || join(homedir(), '.config'),
+    dirs: {
+      chrome: 'google-chrome', 'chrome-beta': 'google-chrome-beta', 'chrome-dev': 'google-chrome-unstable',
+      chromium: 'chromium', edge: 'microsoft-edge', brave: 'BraveSoftware/Brave-Browser', vivaldi: 'vivaldi'
+    }
+  }
 };
 export function hostManifests() {
   const table = BROWSERS[process.platform];
-  if (!table) throw Error('暂不支持 ' + process.platform + '，目前仅支持 macOS 上的 Google Chrome');
-  return Object.entries(table).map(([browser, dir]) => ({browser, path: join(homedir(), dir, HOST_NAME + '.json')}));
+  if (!table) throw Error('暂不支持 ' + process.platform + '，目前支持 macOS 与 Linux');
+  const base = table.base();
+  return Object.entries(table.dirs)
+    .filter(([browser, dir]) => browser === 'chrome' || existsSync(join(base, dir)))
+    .map(([browser, dir]) => ({browser, path: join(base, dir, 'NativeMessagingHosts', HOST_NAME + '.json')}));
 }
 export function extensionId(key) {
   return [...createHash('sha256').update(Buffer.from(key, 'base64')).digest('hex').slice(0, 32)]

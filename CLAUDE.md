@@ -10,6 +10,7 @@ package.json - 运行依赖、命令入口与测试脚本。
 package-lock.json - 固定依赖版本。
 README.md - 中文安装、接入、使用与排错说明。
 README.en.md - 英文说明。
+CHANGELOG.md - 版本记录与对外接口的兼容约定。
 CUSTOMIZE.md - 维护自己版本的改法。
 LICENSE - MIT 许可证。
 .github/workflows/test.yml - 在 macOS 与 Linux 上运行测试。

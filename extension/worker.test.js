@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 用内存中的 chrome 对象模拟标签页、本机端口与脚本注入，每个用例重新加载 worker.js。
- * [OUTPUT]: 验证自动连接、选页顺序、批次沿用、后台新开、未登录不重复新开、点击固定与解除、断线重连。
+ * [OUTPUT]: 验证自动连接、选页顺序、批次沿用、后台新开、未登录不重复新开、点击固定与解除、断线重连与页面自检。
  * [POS]: 只覆盖 worker 的连接与选页，页面内操作由 page.test.js 覆盖。按 config.js 的 AUTO_CONNECT 默认值运行。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -199,4 +199,35 @@ test('使用中的标签页被关闭时说明原因', async () => {
   const response = await chrome.inspect();
   assert.match(response.error, /已关闭或刷新/);
   assert.equal(response.status, 'blocked');
+});
+
+test('页面自检展开资源列表并只读检查当前资源首页', async () => {
+  const chrome = await start([{id:3, url:page('example.com'), active:true}]);
+  const calls = [];
+  chrome.scripting.executeScript = async ({func, args = []}) => {
+    calls.push([func.name, ...args.slice(1)]);
+    if (func.name === 'selectProperty') return [{result: args[2] ? {properties:['sc-domain:example.com']} : {property:'sc-domain:example.com'}}];
+    if (func.name === 'submitInPage') return [{result:{status:'inspected', headline:'网址已收录到 Google', reason:'网页已编入索引'}}];
+    return [{result:{url:page('example.com'), lang:'zh-CN'}}];
+  };
+  await chrome.ports[0].deliver({operation:{mode:'probe'}});
+  const {checks} = chrome.ports[0].sent.at(-1);
+  assert.deepEqual(checks.map(check => check.ok), [true, true, true, true]);
+  assert.match(checks[0].detail, /zh-CN/);
+  const inspected = calls.find(([name]) => name === 'submitInPage');
+  assert.deepEqual(inspected.slice(1, 4), ['https://example.com/', 'sc-domain:example.com', 'inspect']);
+});
+
+test('页面自检在规则失效时指出要改的规则', async () => {
+  const chrome = await start([{id:3, url:page('example.com'), active:true}]);
+  chrome.scripting.executeScript = async ({func}) => {
+    if (func.name === 'selectProperty') return [{result:{error:'找不到 GSC 资源选择器'}}];
+    if (func.name === 'submitInPage') return [{result:{status:'blocked', error:'找不到网址检查框'}}];
+    return [{result:{url:page('example.com'), lang:'de'}}];
+  };
+  await chrome.ports[0].deliver({operation:{mode:'probe'}});
+  const {checks} = chrome.ports[0].sent.at(-1);
+  assert.deepEqual(checks.map(check => check.ok), [true, false, false]);
+  assert.match(checks[1].fix, /propertyPicker/);
+  assert.match(checks[2].fix, /inspectInput/);
 });

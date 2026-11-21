@@ -66,6 +66,6 @@ server.registerTool('gsc_stop_batch', {
 }, async ({id}) => output(await stopBatch(id)));
 server.registerTool('gsc_doctor', {
   description:'检查本机安装、浏览器连接和扩展版本。工具报连接错误时先调用它，按 fix 提示用户处理。',
-  inputSchema:{}
-}, async () => output(await doctor()));
+  inputSchema:{page:z.boolean().default(false).describe('同时在真实 GSC 页面只读核对文案规则：展开资源列表，检查当前资源首页，不提交，约需 10–30 秒。找不到检查框、等不到报告或缺少 reason 时使用')}
+}, async ({page}) => output(await doctor({page})));
 await server.connect(new StdioServerTransport());

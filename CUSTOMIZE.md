@@ -16,7 +16,7 @@ npm test          # 确认没改坏
 npm run setup     # 把新版本复制到 ~/.gsc-agent
 ```
 
-然后在 `chrome://extensions` 点扩展卡片上的刷新按钮，重启 agent 的 MCP 连接，最后运行 `npm run doctor`。关闭了自动连接的，刷新后还要在 GSC 页面点击扩展图标。
+然后在浏览器的扩展管理页点扩展卡片上的刷新按钮，重启 agent 的 MCP 连接，最后运行 `npm run doctor`。改了文案规则的，再运行 `npm run doctor -- --page` 在真实页面核对。关闭了自动连接的，刷新后还要在 GSC 页面点击扩展图标。
 
 ## 常见改法
 
@@ -36,7 +36,7 @@ npm run setup     # 把新版本复制到 ~/.gsc-agent
 
 ### GSC 改版后失效
 
-先看 agent 返回的错误停在哪一步，再对照 `extension/config.js` 中的规则，到真实页面上核对文字有没有变：
+先运行 `npm run doctor -- --page`。它在真实 GSC 页面上展开资源列表，再只读检查当前资源首页，失败的那一项会写明要改哪条规则。也可以看 agent 返回的错误停在哪一步，对照下表到真实页面上核对文字有没有变：
 
 | 错误 | 对应规则 |
 |---|---|
@@ -73,16 +73,18 @@ node bridge/cli.js keygen   # 生成新公钥写入 manifest.json，打印新扩
 
 ### 支持更多浏览器
 
-在 `bridge/install.js` 的 `BROWSERS` 表中，为对应平台加一行原生宿主目录即可，例如 macOS 上的 Chromium 系浏览器：
+在 `bridge/install.js` 的 `BROWSERS` 表中，为对应平台加一行浏览器的用户数据目录（相对 `base`）即可，例如：
 
 ```js
 darwin: {
-  chrome: 'Library/Application Support/Google/Chrome/NativeMessagingHosts',
-  edge: 'Library/Application Support/Microsoft Edge/NativeMessagingHosts'
+  base: () => join(homedir(), 'Library/Application Support'),
+  dirs: { chrome: 'Google/Chrome', edge: 'Microsoft Edge', yourbrowser: 'Your/Browser' }
 }
 ```
 
-`setup` 会为表中的每个浏览器写入宿主清单，`doctor` 也会逐个检查。目前只验证过 Google Chrome。
+`setup` 只为目录存在的浏览器写入 `NativeMessagingHosts/<宿主名>.json`（Chrome 总会写），`doctor` 也逐个检查。实际在真实页面上验证过的只有 Chrome，其他浏览器用的是同一套 Chromium 接口。
+
+Windows 还不支持：它的原生宿主要写注册表，宿主得是 `.bat` 或 `.exe`，本机套接字也要换成命名管道。欢迎提 PR。
 
 ## 开发时直接加载仓库目录
 
@@ -93,3 +95,5 @@ darwin: {
 - `package.json` 和 `extension/manifest.json` 的版本号必须一致，测试会检查。
 - `bridge/native.js` 只能依赖 Node 内置模块和 `bridge/install.js` 中 `HOST_FILES` 列出的文件，因为宿主是被单独复制出去运行的。
 - 提交前运行 `npm test`。仓库的 GitHub Actions 会在 macOS 和 Linux 上自动跑同样的测试。
+- 改了 MCP 工具名、参数或结果字段，或改了命令行，在 `CHANGELOG.md` 记一条；不兼容的升次版本号并标注「不兼容」。
+- 发版后打标签：`git tag v<版本号> && git push origin v<版本号>`。
