@@ -6,7 +6,7 @@ GSC 会改版，每个人的界面语言和使用习惯也不同。本项目把�
 
 | 文件 | 内容 |
 |---|---|
-| `extension/config.js` | 本机宿主名 `HOST_NAME`；GSC 页面文案规则（资源选择器、检查框、报告标题、按钮、确认框、错误提示、关闭按钮）；页面各阶段的等待时间 |
+| `extension/config.js` | 本机宿主名 `HOST_NAME`；自动连接开关 `AUTO_CONNECT`；GSC 页面文案规则（资源选择器、检查框、报告标题、按钮、确认框、错误提示、关闭按钮）；页面各阶段的等待时间 |
 | `bridge/config.js` | 数据目录 `~/.gsc-agent`；每个资源的每日提交上限、批次默认间隔、单条操作的总超时 |
 
 改完任何文件，都按这个顺序走一遍：
@@ -16,7 +16,7 @@ npm test          # 确认没改坏
 npm run setup     # 把新版本复制到 ~/.gsc-agent
 ```
 
-然后在 `chrome://extensions` 点扩展卡片上的刷新按钮，在 GSC 页面重新点击扩展图标，重启 agent 的 MCP 连接，最后运行 `npm run doctor`。
+然后在 `chrome://extensions` 点扩展卡片上的刷新按钮，重启 agent 的 MCP 连接，最后运行 `npm run doctor`。关闭了自动连接的，刷新后还要在 GSC 页面点击扩展图标。
 
 ## 常见改法
 
@@ -49,6 +49,10 @@ npm run setup     # 把新版本复制到 ~/.gsc-agent
 | 返回 `notice`，需要手动关闭成功框 | `closeButton` |
 
 如果是页面结构变了（不只是文字变了），要改 `extension/property.js` 或 `extension/submit.js`。注意：这两个文件里的函数会被序列化后注入页面执行，**不能引用函数外的任何变量或 import**，需要的数据都通过参数传入。`page.test.js` 用同样的注入方式运行它们，测试通过就说明没破坏这条规则。
+
+### 改为手动连接
+
+把 `extension/config.js` 的 `AUTO_CONNECT` 改为 `false`。之后扩展只在你点击图标时连接本机，agent 只能操作被点击的那个 GSC 标签页，关闭该页即断开。适合同一个 Chrome 里登录了多个 Google 账号、希望每次明确指定账号的情况。
 
 ### 调整默认值
 

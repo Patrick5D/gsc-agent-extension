@@ -2,7 +2,7 @@
 Chrome Manifest V3 + Node.js 22 + MCP SDK。
 
 <directory>
-extension/ - 在已授权标签页执行 GSC 页面操作。
+extension/ - 自动连接本机，在选用或点击固定的 GSC 标签页执行页面操作。
 bridge/ - 连接 MCP 客户端与 Chrome 原生消息端口。
 </directory>
 <config>

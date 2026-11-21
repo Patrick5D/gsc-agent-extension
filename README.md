@@ -5,7 +5,7 @@
 让你本机的 AI agent（Claude Code、Codex、Cursor、Claude Desktop 等）借用你在 Chrome 中已登录的 Google Search Console，替你为网址点击「请求编入索引」，并如实报告 Google 是否确认。
 
 - 不需要 Google OAuth、API Key 或 Google Cloud 项目，用的就是你浏览器里的登录状态。
-- agent 只能操作你点击扩展图标绑定的那一个 GSC 标签页。
+- Chrome 打开后扩展自动连接，agent 使用你已打开的 GSC 标签页；没有时在后台新开一个。想固定用某个标签页，在那一页点击扩展图标。
 - 读到 Google 的确认才报告「已提交」，不确定时如实说明。
 
 ## 能做什么
@@ -46,7 +46,7 @@ npm run setup
 
 1. 打开 `chrome://extensions`，开启「开发者模式」，点击「加载已解压的扩展程序」，选择 `~/.gsc-agent/extension`（setup 会打印完整路径；在选择框中按 ⌘⇧. 可显示隐藏目录）。
 2. 把 MCP 服务加入你的 agent，见下一节。
-3. 在 Chrome 打开已登录的 GSC 资源页，点击扩展图标，徽标显示 ON 即已连接。
+3. 确认 Chrome 已登录 Search Console。扩展加载后会自动连接，徽标显示 ON。
 4. 运行 `npm run doctor`，全部打勾即可使用。
 
 ## 接入 agent
@@ -69,7 +69,12 @@ npm run setup
 - 「检查这 20 个网址有没有收录，只提交没收录的，做完逐条告诉我结果。」
 - 「查一下这个网址最近一次有没有确认提交，给我报告链接。」
 
-重启 Chrome 后，要在 GSC 页面重新点一次扩展图标。想换一个标签页，在新标签页上点图标即可重新绑定。
+### 用哪个标签页
+
+- 默认自动选：已打开的 GSC 资源页中，优先当前显示的那个，其次最近看过的。一个批次自始至终用同一个标签页。
+- 一个都没有时，在后台新开一个 GSC 页面并沿用。未登录时会提示先登录，不会反复新开。
+- 在某个 GSC 页面点击扩展图标，agent 就固定用这一页；关闭这一页后恢复自动选择。
+- 想回到手动连接，把 `extension/config.js` 的 `AUTO_CONNECT` 改为 `false`：只有点击扩展图标后才连接，且只操作被点击的那一页。
 
 ### 工具
 
@@ -111,22 +116,24 @@ npm run setup
 | 现象 | 处理 |
 |---|---|
 | 徽标显示 OFF，提示找不到 native messaging host | 运行 `npm run setup`，然后在 `chrome://extensions` 刷新扩展 |
-| 「请在已登录的 GSC 标签页点击扩展图标」 | 在 GSC 资源页点击扩展图标，徽标显示 ON |
+| 「请确认 Chrome 已打开」，自检显示没有在线连接 | 打开 Chrome；刚安装或更新时在 `chrome://extensions` 刷新扩展；仍不行就在 GSC 页面点击扩展图标 |
+| 「自动打开的 GSC 页面没有进入资源页」 | 在 Chrome 登录 Search Console，然后重试 |
 | 「网址检查框被遮挡」或「按钮被遮挡」 | 关闭 GSC 页面上的弹窗；如果菜单盖住了检查框，把左侧菜单收起或把窗口拉宽 |
-| 「绑定的 GSC 标签页已关闭或刷新」，徽标显示 OFF | 在 GSC 页面重新点击扩展图标 |
+| 「使用中的 GSC 标签页已关闭或刷新」 | 重试即可，会自动换一个标签页 |
 | 「找不到网址检查框」或一直等不到报告 | 把 GSC 界面语言切换为简体中文或英文，或按 [CUSTOMIZE.md](CUSTOMIZE.md) 添加规则 |
 | 工具调用超时 | 调大客户端超时，或改用 `gsc_start_batch` |
 | 切换或删除过 Node 版本 | 重新运行 `npm run setup` |
-| 批次在后台很慢 | 把绑定的标签页放到单独的可见窗口 |
+| 批次在后台很慢 | 把正在使用的 GSC 标签页放到单独的可见窗口 |
+| 同时装在多个 Chrome 配置里，提示只保留一个连接 | 只在一个配置中启用扩展 |
 
 ## 升级与卸载
 
-- **升级**：`git pull && npm install && npm run setup`，然后在 `chrome://extensions` 刷新扩展，在 GSC 页面重新点击图标，再重启 agent 的 MCP 连接。
+- **升级**：`git pull && npm install && npm run setup`，然后在 `chrome://extensions` 刷新扩展，再重启 agent 的 MCP 连接。
 - **卸载**：`node bridge/cli.js uninstall`，然后在 `chrome://extensions` 移除扩展。操作历史会保留在 `~/.gsc-agent/`。
 
 ## 维护自己的版本
 
-所有可定制项集中在两个文件里：GSC 页面文案规则、宿主名和等待时间在 `extension/config.js`，数据目录和默认值在 `bridge/config.js`。增加界面语言、适配 GSC 改版、换成自己的扩展 ID 等做法，见 [CUSTOMIZE.md](CUSTOMIZE.md)。
+所有可定制项集中在两个文件里：自动连接开关、GSC 页面文案规则、宿主名和等待时间在 `extension/config.js`，数据目录和默认值在 `bridge/config.js`。增加界面语言、适配 GSC 改版、换成自己的扩展 ID 等做法，见 [CUSTOMIZE.md](CUSTOMIZE.md)。
 
 ## 局限与风险
 
@@ -140,7 +147,7 @@ npm run setup
 npm test
 ```
 
-测试包括：用模拟的 Chrome 消息验证 MCP 到本机宿主的完整链路；用 jsdom 模拟页面验证页面脚本；验证命令行的安装、自检与卸载。测试不会向 Google 提交任何请求。模拟页面是按本项目对 GSC 页面结构的假设搭建的，不能代替在真实页面上核对。
+测试包括：用模拟的 Chrome 消息验证 MCP 到本机宿主的完整链路；用 jsdom 模拟页面验证页面脚本；用模拟的 chrome 接口验证扩展的自动连接与选页；验证命令行的安装、自检与卸载。测试不会向 Google 提交任何请求。资源选择器按真实 GSC 页面的结构搭建，报告页仍是简化模拟，不能代替在真实页面上核对。
 
 ## 许可证
 

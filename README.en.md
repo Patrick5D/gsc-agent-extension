@@ -5,7 +5,7 @@ English · [简体中文](README.md)
 Let your local AI agent (Claude Code, Codex, Cursor, Claude Desktop, …) use the Google Search Console you are already logged into in Chrome to click **Request indexing** for your URLs — and report honestly whether Google confirmed it.
 
 - No Google OAuth, API key or Cloud project. It uses your existing browser session.
-- The agent can only operate the one GSC tab you bind by clicking the extension icon.
+- The extension connects automatically when Chrome starts. The agent uses a GSC tab you already have open, or opens one in the background. Click the extension icon on a GSC tab to pin the agent to that tab.
 - It reports `submitted` only after reading Google's confirmation.
 
 > Note: tool results, CLI output and error messages are currently in Simplified Chinese. Your agent can read and translate them for you.
@@ -46,7 +46,7 @@ npm run setup
 
 1. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and choose `~/.gsc-agent/extension`. Press ⌘⇧. in the file picker to show hidden folders.
 2. Add the MCP server to your agent (see below).
-3. Open a GSC property page in Chrome, click the extension icon, and wait for the badge to show **ON**.
+3. Make sure Chrome is logged into Search Console. The extension connects on its own and the badge shows **ON**.
 4. Run `npm run doctor`. Every check should pass.
 
 ## Connect your agent
@@ -66,7 +66,7 @@ Just ask your agent, for example:
 - "Request indexing for https://example.com/article with gsc_request_indexing."
 - "Check these 20 URLs, submit only the unindexed ones, and report each result."
 
-After restarting Chrome, click the extension icon on the GSC page again.
+Which tab is used: an open GSC property tab, preferring the visible one, then the most recently viewed; a batch keeps the same tab. With none open, a GSC tab is opened in the background and reused. Clicking the extension icon on a GSC tab pins the agent there until that tab is closed. Set `AUTO_CONNECT` to `false` in `extension/config.js` to connect only when you click the icon.
 
 | Tool | Purpose |
 |---|---|
@@ -91,11 +91,11 @@ Batch and quota rules:
 
 - Only one batch runs at a time.
 - Set the per-property limit with `GSC_AGENT_DAILY_QUOTA` (default 10). `0` disables it.
-- Chrome throttles timers in background tabs. For long batches, keep the bound tab in its own visible window.
+- Chrome throttles timers in background tabs. For long batches, keep the GSC tab in use in its own visible window.
 
 ## Maintain your own version
 
-Everything customizable lives in two files. `extension/config.js` holds the GSC text rules, the native host name and the page timeouts. `bridge/config.js` holds the data directory and the defaults. See [CUSTOMIZE.md](CUSTOMIZE.md) (Simplified Chinese) for adding a GSC language, adapting to a GSC redesign, or using your own extension ID.
+Everything customizable lives in two files. `extension/config.js` holds the auto-connect switch, the GSC text rules, the native host name and the page timeouts. `bridge/config.js` holds the data directory and the defaults. See [CUSTOMIZE.md](CUSTOMIZE.md) (Simplified Chinese) for adding a GSC language, adapting to a GSC redesign, or using your own extension ID.
 
 ## Limitations
 
@@ -105,7 +105,7 @@ Everything customizable lives in two files. `extension/config.js` holds the GSC 
 
 ## Development
 
-`npm test` runs MCP-to-host integration tests with a simulated Chrome, page-script tests on jsdom, and CLI tests. Nothing is sent to Google.
+`npm test` runs MCP-to-host integration tests with a simulated Chrome, page-script tests on jsdom, service-worker tests with a simulated `chrome` API, and CLI tests. Nothing is sent to Google.
 
 ## License
 

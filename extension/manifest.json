@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "GSC Agent",
-  "version": "0.3.3",
-  "description": "将当前 Search Console 标签页连接到本机 agent。",
+  "version": "0.4.0",
+  "description": "把 Search Console 标签页连接到本机 agent。",
   "permissions": [
     "nativeMessaging",
     "scripting"
@@ -11,7 +11,7 @@
     "https://search.google.com/*"
   ],
   "action": {
-    "default_title": "连接当前 GSC 标签页"
+    "default_title": "让 agent 固定使用当前 GSC 标签页"
   },
   "background": {
     "service_worker": "worker.js",

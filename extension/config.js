@@ -1,12 +1,17 @@
 /**
  * [INPUT]: 无。维护者按自己的 GSC 界面语言和需要修改本文件。
- * [OUTPUT]: 本机宿主名、GSC 页面文案规则与页面等待时间。
+ * [OUTPUT]: 本机宿主名、自动连接开关、GSC 页面文案规则与页面等待时间。
  * [POS]: 扩展唯一的可定制入口。worker 读取后作为参数传入注入函数，setup 读取宿主名。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
 // 本机宿主名。分支版本若要与原版并存，改成自己的名字，并运行 keygen 换扩展 ID。
 export const HOST_NAME = 'com.local.gsc_agent';
+
+// 自动连接：Chrome 启动后扩展自行连接本机，agent 请求时自动选用已打开的 GSC 标签页，没有就在后台新开一个。
+// 改为 false 后，须在 GSC 页面点击扩展图标才连接，agent 只能操作被点击的那个标签页。
+// 两种模式下，点击图标都会把 agent 固定到当前标签页。
+export const AUTO_CONNECT = true;
 
 // GSC 页面文案规则。新增语言时，在 GSC 中切换到该语言，把页面上的原文加入对应规则。
 // 规则以 [source, flags] 传入页面，页面内用 new RegExp 还原。

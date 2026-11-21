@@ -72,7 +72,8 @@ try {
 
 ${config()}
 
-3. 在 Chrome 打开已登录的 GSC 资源页，点击扩展图标，徽标显示 ON。
+3. 确认 Chrome 已登录 Search Console，扩展会自动连接，徽标显示 ON。
+   （extension/config.js 的 AUTO_CONNECT 为 false 时，需在 GSC 页面点击扩展图标。）
 4. 运行 gsc-agent doctor 检查（仓库内为 npm run doctor）。`);
   } else if (command === 'config') {
     console.log(config(arg));

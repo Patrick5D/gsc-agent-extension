@@ -9,6 +9,12 @@ import net from 'node:net';
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { socketDir, defaults } from './config.js';
+import { AUTO_CONNECT } from '../extension/config.js';
+
+// 没有在线连接时的修复建议，自检共用。
+export const OFFLINE = AUTO_CONNECT
+  ? '请确认 Chrome 已打开。刚安装或更新时，在 chrome://extensions 刷新扩展；仍未连接时在 GSC 页面点击扩展图标'
+  : '请在已登录的 GSC 标签页点击扩展图标';
 
 // 逐个尝试连接，删除无人监听的残留套接字。
 async function liveSockets() {
@@ -50,7 +56,7 @@ async function request(url, mode, exhausted) {
   const live = await liveSockets();
   if (live.length !== 1) {
     live.forEach(socket => socket.destroy());
-    throw Error(live.length ? '请只保留一个连接的 Chrome 配置' : '请在已登录的 GSC 标签页点击扩展图标');
+    throw Error(live.length ? '请只保留一个连接的 Chrome 配置' : OFFLINE);
   }
   const message = mode === 'submit' && !exhausted.length ? {url}
     : {operation:exhausted.length ? {url, mode, exhausted} : {url, mode}};

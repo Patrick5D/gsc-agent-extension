@@ -1,6 +1,6 @@
 {
   "name": "gsc-agent",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Let your local AI agent request indexing in your logged-in Google Search Console tab, via MCP.",
   "keywords": [
     "mcp",
