@@ -23,18 +23,21 @@ const rules = {
   requestButton: /^(请求编入索引|request indexing)(?:\s|$)/i,
   // 提交成功对话框文字。
   confirmed: /indexing requested|added to a priority crawl queue|已请求(?:将网址)?编入索引|已请求(?:将网址)?编入工作索引|已加入优先抓取队列|已添加到优先抓取队列/i,
-  // 出现即停止的对话框文字：配额、验证码、出错。
-  problem: /quota|captcha|something went wrong|couldn.t submit|request rejected|配额|验证码|出了点问题|请求遭拒|无法提交/i,
+  // 出现即停止的对话框文字：配额、验证码、出错、网址不在当前资源中。
+  problem: /quota|captcha|something went wrong|couldn.t submit|request rejected|not in property|配额|验证码|出了点问题|请求遭拒|无法提交|不在该资源中/i,
   // 成功对话框的关闭按钮文字。
   closeButton: /^(知道了|确定|关闭|好|got it|ok|close|dismiss)$/i
 };
 
-// 页面等待时间（毫秒）。四项相加须小于 bridge/config.js 的 requestTimeoutMs。
+// 页面等待时间（毫秒）。各项相加须小于 bridge/config.js 的 requestTimeoutMs。
 const timeouts = {
-  propertySwitch: 8000,
+  // 整页打开目标资源。
+  propertySwitch: 15000,
   inspectInput: 15000,
-  report: 80000,
-  confirmation: 150000
+  report: 60000,
+  confirmation: 150000,
+  // 检查框或按钮被弹窗、菜单遮住时，等它消失的最长时间。
+  unblock: 3000
 };
 
 export const UI = {

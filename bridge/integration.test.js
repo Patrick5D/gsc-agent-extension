@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 使用临时主目录与模拟的 Chrome 消息管道。
- * [OUTPUT]: 验证单条兼容、版本报告与自检、本机配额、批次去重、互斥、进度、停止与中断续跑。
+ * [OUTPUT]: 验证单条兼容、版本报告与自检、本机配额（不计只读检查）、批次去重、互斥、进度、停止与中断续跑。
  * [POS]: 从 MCP 客户端跨进程验证原生桥接协议。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -19,6 +19,10 @@ test('单 URL、配额与批次经过 MCP 和本机宿主', {timeout:20000}, asy
   // 预置一个无人监听的残留套接字文件，应被跳过并删除。
   await mkdir(join(temp, '.gsc-agent'), {recursive:true});
   await writeFile(join(temp, '.gsc-agent', '1.sock'), '');
+  // 预置一条旧版误记的只读记录，配额设为 1 时也不应让该资源被判为已满。
+  await mkdir(join(temp, '.gsc-agent', 'history'), {recursive:true});
+  await writeFile(join(temp, '.gsc-agent', 'history', 'old.json'), JSON.stringify({id:'old', url:'https://example.com/old', mode:'inspect',
+    status:'unconfirmed', property:'sc-domain:example.com', startedAt:new Date().toISOString(), finishedAt:new Date().toISOString()}));
   const host = spawn(process.execPath, ['bridge/native.js'], {env});
   const client = new Client({name:'test', version:'1'});
   t.after(async () => {
@@ -73,6 +77,9 @@ test('单 URL、配额与批次经过 MCP 和本机宿主', {timeout:20000}, asy
   const checks = Object.fromEntries((await invoke('gsc_doctor',{})).checks.map(check => [check.name, check]));
   assert.equal(checks['浏览器连接'].ok, true);
   assert.equal(checks['运行中的版本'].ok, true, checks['运行中的版本'].detail);
+  const invalid = await reject('gsc_request_indexing',{url:'not a url'});
+  assert.match(invalid, /完整的 http/);
+  assert.doesNotMatch(invalid, /账户密码/);
   const url = 'https://example.com/article';
   const property = 'sc-domain:example.com';
   const waiting = client.callTool({name:'gsc_request_indexing', arguments:{url}});

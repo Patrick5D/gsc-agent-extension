@@ -41,6 +41,8 @@ npm run setup     # 把新版本复制到 ~/.gsc-agent
 | 错误 | 对应规则 |
 |---|---|
 | 找不到 GSC 资源选择器 | `propertyPicker` |
+| GSC 资源列表没有展开 | `extension/property.js` 中的 `attempts`（打开列表的方式） |
+| 一直等不到报告，页面上其实有 GSC 的出错弹窗 | `problem`（把弹窗标题加进去，出现时立即停下） |
 | 找不到网址检查框 | `inspectInput` |
 | 一直等不到报告，或 `if_unindexed` 停在检查阶段 | `indexed`、`unindexed`、`requestButton` |
 | 点击后 `unconfirmed` | `confirmed` |
@@ -52,7 +54,7 @@ npm run setup     # 把新版本复制到 ~/.gsc-agent
 
 - **每日上限**：在 MCP 配置中设置环境变量 `GSC_AGENT_DAILY_QUOTA`，不用改代码。也可以改 `bridge/config.js` 的 `dailyQuota` 默认值。
 - **批次间隔**：agent 调用时可以传 `interval_seconds`，默认值改 `bridge/config.js` 的 `intervalSeconds`。
-- **等待时间**：改 `extension/config.js` 的 `timeouts`。四项之和必须小于 `bridge/config.js` 的 `requestTimeoutMs`，并且客户端的工具超时要比 `requestTimeoutMs` 更长。
+- **等待时间**：改 `extension/config.js` 的 `timeouts`。各项之和必须小于 `bridge/config.js` 的 `requestTimeoutMs`，并且客户端的工具超时要比 `requestTimeoutMs` 更长。
 
 ### 用自己的扩展 ID，与原版并存
 

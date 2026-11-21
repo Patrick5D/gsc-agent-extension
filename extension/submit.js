@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 读取 config.js 的文案规则与等待时间、当前 GSC 资源、目标网址、报告页面和本机配额判断。
- * [OUTPUT]: 返回检查状态或提交确认，关闭已识别的成功框。
+ * [OUTPUT]: 返回检查状态或提交确认，关闭已识别的成功框。检查框或按钮被遮住时停下。
  * [POS]: 在标签页内完成单网址操作。函数随脚本注入，须自包含。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -31,6 +31,24 @@ export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit"
     }
 
     const dialogs = () => elements('[role="dialog"],[role="alertdialog"],[aria-modal="true"]');
+    // 只有弹窗或固定定位的覆盖层盖住控件中心才算遮挡。展开的导航菜单不盖住控件时不影响操作，
+    // 输入框的浮动标签等与控件同属一个外层的元素也不算。
+    const covered = el => {
+      if (!document.elementFromPoint) return false;
+      const box = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      for (let node = hit; node && node !== document.body; node = node.parentElement) {
+        if (node.contains(el)) return false;
+        if (node.matches('[role="dialog"],[role="alertdialog"],[aria-modal="true"]') || getComputedStyle(node).position === 'fixed') return true;
+      }
+      return false;
+    };
+    const requestButtons = () => elements('button,[role="button"]').filter(el =>
+      !el.disabled && el.getAttribute('aria-disabled') !== 'true' && rule('requestButton').test(el.innerText.trim()));
+    const unblocked = (el, message) => {
+      el.scrollIntoView?.({block:'center', inline:'center'});
+      return wait(() => !covered(el) && el, ui.timeouts.unblock, message);
+    };
     // DOM 变化时立即检查，定时器兜底。后台标签页的定时器会被节流，DOM 回调不受影响。
     function wait(check, timeout, message = '等待 GSC 页面确认超时') {
       const end = Date.now() + timeout;
@@ -69,9 +87,9 @@ export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit"
       });
     }
 
-    if (dialogs().length) throw Error('请先关闭 GSC 对话框');
     const input = await wait(() => elements('input').find(el => rule('inspectInput').test(
       [el.placeholder, el.getAttribute('aria-label')].join(' '))), ui.timeouts.inspectInput, '找不到网址检查框，请检查 config.js 的 inspectInput 规则');
+    await unblocked(input, '网址检查框被遮挡，请关闭 GSC 页面上的弹窗或菜单后重试');
     const previousId = report().searchParams.get('id');
     input.focus();
     input.value = target.href;
@@ -94,16 +112,17 @@ export async function submitInPage(ui, rawUrl, expectedProperty, mode = "submit"
         const indexed = indexedTitle.test(headline);
         if (mode === 'inspect' || indexed) return {indexed, headline};
       }
-      return elements('button,[role="button"]').find(el =>
-        !el.disabled && el.getAttribute('aria-disabled') !== 'true' &&
-        rule('requestButton').test(el.innerText.trim()));
+      return requestButtons()[0];
     }, ui.timeouts.report);
     if ('indexed' in fresh) {
       return {status:mode === 'inspect' ? 'inspected' : 'already_indexed', ...fresh, url:target.href, reportUrl:location.href};
     }
     if (!canSubmit) throw Error('本机记录显示该资源 24 小时内的提交已达上限，未点击提交');
-    if (dialogs().length) throw Error('请求按钮被对话框遮挡');
-    fresh.click();
+    // 报告渲染时按钮节点可能被替换，或旧报告的按钮留在新报告下方。每次重新找当前未被遮住的按钮。
+    fresh.scrollIntoView?.({block:'center', inline:'center'});
+    const button = await wait(() => requestButtons().find(el => !covered(el)), ui.timeouts.unblock,
+      '「请求编入索引」按钮被遮挡，请关闭 GSC 页面上的弹窗或菜单后重试');
+    button.click();
     clicked = true;
     const confirmation = await wait(() => dialogs().find(el => rule('confirmed').test(el.innerText)), ui.timeouts.confirmation);
     const result = {status:'submitted', url:target.href, reportUrl:location.href, confirmation:confirmation.innerText.slice(0,500)};

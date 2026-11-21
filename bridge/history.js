@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收提交开始时间、目标 URL、执行模式与工具结果。
- * [OUTPUT]: 保存本机操作记录，按 URL 和状态查询，统计各资源 24 小时提交数。
+ * [OUTPUT]: 保存本机操作记录，按 URL 和状态查询，统计各资源 24 小时提交数（只读检查不计入）。
  * [POS]: 每次调用独占一个文件，原子替换执行结果。
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -41,12 +41,12 @@ export async function readHistory({url, status, limit}) {
   const matches = (await readAll()).filter(item => (!url || item.url === url) && (!status || item.status === status));
   return matches.sort((a,b) => b.startedAt.localeCompare(a.startedAt)).slice(0,limit);
 }
-// 已点击提交的记录都计入配额，未确认的也算，宁可高估。
+// 可能已点击提交的记录都计入配额，未确认的也算，宁可高估。只读检查不会点击，旧版误记的只读记录也一并排除。
 export async function exhaustedProperties(limit, now = Date.now()) {
   if (!(limit > 0)) return [];
   const counts = new Map();
   for (const item of await readAll()) {
-    if (!item.property || !['submitted','unconfirmed'].includes(item.status)) continue;
+    if (item.mode === 'inspect' || !item.property || !['submitted','unconfirmed'].includes(item.status)) continue;
     if (now - Date.parse(item.finishedAt) > 24 * 3600000) continue;
     counts.set(item.property, (counts.get(item.property) || 0) + 1);
   }

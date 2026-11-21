@@ -14,7 +14,7 @@ Let your local AI agent (Claude Code, Codex, Cursor, Claude Desktop, …) use th
 
 - **Single URL or batches.** Batches run in the background in order; duplicates in a batch run once.
 - **Three modes.** `submit` requests indexing (good for updated pages). `inspect` only checks index status. `if_unindexed` inspects first and submits only if the URL is clearly not indexed.
-- **Picks the property for you.** Supports URL-prefix and domain properties, choosing the most specific match.
+- **Picks the property for you.** Supports URL-prefix and domain properties, using the open property if it already covers the URL, otherwise the most specific match.
 - **Protects your quota.** Counts submissions per property over 24 hours and stops at the limit. Batches wait 120 s after each confirmed submission by default.
 - **Stoppable, resumable, auditable.** Stop a batch at any time, resume from `remaining`, and query the local history.
 - **Self-check.** One command verifies installation, browser connection and versions, and tells you how to fix problems.
@@ -51,7 +51,7 @@ npm run setup
 
 ## Connect your agent
 
-`npm run config` prints configs for all supported clients. `npm run config -- <client>` prints one: `claude-code`, `codex`, `cursor`, `claude-desktop` or `json`.
+`npm run config` prints configs for all supported clients. `npm run config -- <client>` prints one: `claude-code`, `codex`, `cursor`, `claude-desktop` or `json`. To save a JSON file, run `node bridge/cli.js config json > mcp.json` (`npm run` adds two banner lines).
 
 A single submission can take up to about 4 minutes, so raise the tool timeout to 270 s or more:
 

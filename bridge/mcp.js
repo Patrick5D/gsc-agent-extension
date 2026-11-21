@@ -12,11 +12,13 @@ import { version, defaults } from './config.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-const urlSchema = z.string().url().regex(/^https?:\/\//i).refine(value => {
-  if (!URL.canParse(value)) return false;
-  const url = new URL(value);
-  return !url.username && !url.password;
-}, '网址不可包含账户密码');
+// 每个无效网址只报一条原因。
+const urlSchema = z.string().superRefine((value, ctx) => {
+  const url = URL.canParse(value) ? new URL(value) : null;
+  const message = !url || !['http:', 'https:'].includes(url.protocol) ? '请输入完整的 http(s) 网址'
+    : url.username || url.password ? '网址不可包含账户密码' : '';
+  if (message) ctx.addIssue({code: z.ZodIssueCode.custom, message});
+});
 const modeSchema = z.enum(['submit','inspect','if_unindexed']).default('submit');
 const skipHours = z.number().finite().nonnegative().default(0).describe('仅在指定小时内有已确认提交记录时跳过，默认关闭。只检查模式忽略此项。');
 const intervalSchema = z.number().finite().min(0).max(3600).default(defaults.intervalSeconds).describe('每次确认提交后等待的秒数，默认 ' + defaults.intervalSeconds + '。只读检查之间最多等 3 秒。');
@@ -42,7 +44,7 @@ server.registerTool('gsc_submission_history', {
 }, async filters => output(await readHistory({...filters, url:filters.url && new URL(filters.url).href})));
 server.registerTool('gsc_start_batch', {
   description:'后台顺序处理 URL，同批去重，返回批次 ID。同一时间只运行一个批次。用 gsc_batch_status 查询直到结束。',
-  inputSchema:{urls:z.array(urlSchema).min(1), skip_recent_hours:skipHours, mode:modeSchema, interval_seconds:intervalSchema}
+  inputSchema:{urls:z.array(urlSchema).min(1).max(500), skip_recent_hours:skipHours, mode:modeSchema, interval_seconds:intervalSchema}
 }, async ({urls,mode,skip_recent_hours,interval_seconds}) => output(await startBatch(urls,mode,skip_recent_hours,interval_seconds)));
 server.registerTool('gsc_batch_status', {
   description:'读取批次进度、每条结果和未开始网址；nextAt 表示下一条的开始时间。只续跑 remaining 中的 URL。',
